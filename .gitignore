@@ -1,0 +1,34 @@
+# Environment
+.env
+.env.local
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# Node
+node_modules/
+.next/
+out/
+
+# Docker volumes
+postgres_data/
+redis_data/
+chroma_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and local artifacts
+*.log
+backend-logs*.txt
+build.log
+docker-build*.log
+browser-*.png
