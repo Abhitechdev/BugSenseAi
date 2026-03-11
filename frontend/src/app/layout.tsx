@@ -66,7 +66,7 @@ export default function RootLayout({
                             </a>
                             <div className="h-4 w-px bg-white/10" />
                             <a
-                                href="https://github.com"
+                                href="https://github.com/Abhitechdev/BugSenseAi"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-sm text-gray-500 transition hover:text-white"
