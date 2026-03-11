@@ -3,6 +3,7 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import List
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -36,6 +37,17 @@ class Settings(BaseSettings):
 
     # ── Rate Limiting ──
     rate_limit_per_minute: int = 30
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def normalize_debug(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"true", "1", "yes", "on"}:
+                return True
+            if normalized in {"false", "0", "no", "off"}:
+                return False
+        return value
 
     @property
     def cors_origin_list(self) -> List[str]:
