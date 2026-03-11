@@ -1,6 +1,5 @@
 # BugSense AI – Production Specification Document
 
-Prepared for: AntiGravity Engineering System
 
 ---
 
