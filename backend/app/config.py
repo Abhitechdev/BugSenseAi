@@ -2,6 +2,7 @@
 
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -10,6 +11,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     debug: bool = True
     secret_key: str = "change-me"
+    backend_host: str = "0.0.0.0"
+    backend_port: int = 8000
+    cors_origins: str = "http://localhost:3000,http://frontend:3000"
 
     # ── Database ──
     database_url: str = "postgresql+asyncpg://bugsense:bugsense_secret@postgres:5432/bugsense_db"
@@ -32,6 +36,10 @@ class Settings(BaseSettings):
 
     # ── Rate Limiting ──
     rate_limit_per_minute: int = 30
+
+    @property
+    def cors_origin_list(self) -> List[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     class Config:
         env_file = (".env.local", ".env")
