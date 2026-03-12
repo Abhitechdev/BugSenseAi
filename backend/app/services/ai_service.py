@@ -4,7 +4,7 @@ import json
 import httpx
 import structlog
 from typing import Optional
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from app.config import get_settings
 
 logger = structlog.get_logger(__name__)
@@ -153,7 +153,18 @@ class AIService:
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=60.0)
+            # Configure client with better timeout handling
+            timeout = httpx.Timeout(
+                connect=10.0,    # Connection timeout
+                read=60.0,       # Read timeout
+                write=30.0,      # Write timeout
+                pool=20.0        # Pool timeout
+            )
+            self._client = httpx.AsyncClient(
+                timeout=timeout,
+                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+                retries=3
+            )
         return self._client
 
     @staticmethod
@@ -213,9 +224,14 @@ class AIService:
                 },
             )
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(min=1, max=10),
+        retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError)),
+        reraise=True
+    )
     async def _call_llm(self, prompt: str) -> dict:
-        """Make a request to the configured LLM provider."""
+        """Make a request to the configured LLM provider with enhanced error handling."""
         url, headers = self._get_api_config()
         client = await self._get_client()
 
@@ -256,68 +272,92 @@ class AIService:
                 "max_tokens": 2000,
             }
 
-        logger.info("llm_request", provider=self.settings.ai_provider, model=self.settings.ai_model)
+        logger.info(
+            "llm_request", 
+            provider=self.settings.ai_provider, 
+            model=self.settings.ai_model,
+            prompt_length=len(prompt)
+        )
 
-        response = await client.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-
-        data = response.json()
-
-        # Extract content based on provider response format
-        if self.settings.ai_provider == "gemini":
-            content = data["candidates"][0]["content"]["parts"][0]["text"]
-        elif self.settings.ai_provider == "anthropic":
-            content = data["content"][0]["text"]
-        else:
-            content = data["choices"][0]["message"]["content"]
-
-        # Strip markdown code fences if present
-        content = content.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        
-        # Sanitize AI output
-        content = content.strip()
-        content = content.replace("\n", " ")
-        content = content.replace("\t", " ")
-
-        # Safe JSON parsing
         try:
-            result = json.loads(content)
-        except json.JSONDecodeError as e:
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+
+            data = response.json()
+
+            # Extract content based on provider response format
+            if self.settings.ai_provider == "gemini":
+                content = data["candidates"][0]["content"]["parts"][0]["text"]
+            elif self.settings.ai_provider == "anthropic":
+                content = data["content"][0]["text"]
+            else:
+                content = data["choices"][0]["message"]["content"]
+
+            # Strip markdown code fences if present
+            content = content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+            
+            # Sanitize AI output
+            content = content.strip()
+            content = content.replace("\n", " ")
+            content = content.replace("\t", " ")
+
+            # Safe JSON parsing
+            try:
+                result = json.loads(content)
+            except json.JSONDecodeError as e:
+                logger.error(
+                    "json_parse_error",
+                    error=str(e),
+                    raw_content_length=len(content),
+                )
+                result = {
+                    "language": "unknown",
+                    "environment": "unknown",
+                    "error_type": "ParsingError",
+                    "explanation": "AI response format invalid",
+                    "root_cause": "Generated output was not valid JSON",
+                    "fix": "Retry analysis request",
+                    "example_solution": ""
+                }
+
+            # Response Validation Layer
+            required_keys = ["language", "environment", "error_type", "explanation", "root_cause", "fix", "example_solution"]
+            for key in required_keys:
+                if key not in result:
+                    result[key] = "Not available"
+                elif isinstance(result[key], list):
+                    # Ensure the field is converted to a string if AI returned a list (e.g., list of fix steps)
+                    if key == "fix":
+                        result[key] = "\n".join(f"- {step}" for step in result[key])
+                    else:
+                        result[key] = " ".join(str(item) for item in result[key])
+
+            logger.info("llm_response_parsed", error_type=result.get("error_type"))
+            return result
+            
+        except httpx.TimeoutException as e:
+            logger.error("llm_timeout_error", error=str(e), provider=self.settings.ai_provider)
+            raise
+        except httpx.NetworkError as e:
+            logger.error("llm_network_error", error=str(e), provider=self.settings.ai_provider)
+            raise
+        except httpx.HTTPStatusError as e:
             logger.error(
-                "json_parse_error",
-                error=str(e),
-                raw_content_length=len(content),
+                "llm_http_error", 
+                error=str(e), 
+                status_code=e.response.status_code,
+                provider=self.settings.ai_provider
             )
-            result = {
-                "language": "unknown",
-                "environment": "unknown",
-                "error_type": "ParsingError",
-                "explanation": "AI response format invalid",
-                "root_cause": "Generated output was not valid JSON",
-                "fix": "Retry analysis request",
-                "example_solution": ""
-            }
-
-        # Response Validation Layer
-        required_keys = ["language", "environment", "error_type", "explanation", "root_cause", "fix", "example_solution"]
-        for key in required_keys:
-            if key not in result:
-                result[key] = "Not available"
-            elif isinstance(result[key], list):
-                # Ensure the field is converted to a string if AI returned a list (e.g., list of fix steps)
-                if key == "fix":
-                    result[key] = "\n".join(f"- {step}" for step in result[key])
-                else:
-                    result[key] = " ".join(str(item) for item in result[key])
-
-        logger.info("llm_response_parsed", error_type=result.get("error_type"))
-        return result
+            raise
+        except Exception as e:
+            logger.error("llm_unexpected_error", error=str(e), provider=self.settings.ai_provider)
+            raise
 
     async def analyze_error(self, input_text: str, language_hint: Optional[str] = None) -> dict:
         lang_ctx = f"The code is written in {language_hint}." if language_hint else "Detect the programming language from the error."
@@ -359,6 +399,45 @@ class AIService:
             scores[lang] = sum(1 for kw in keywords if kw.lower() in text_lower)
         best = max(scores, key=scores.get)
         return best if scores[best] > 0 else None
+
+    async def ping(self):
+        """Test AI provider connectivity with a simple request."""
+        try:
+            # Use a minimal prompt to test connectivity
+            prompt = "Test connectivity. Respond with: {\"status\": \"ok\"}"
+            url, headers = self._get_api_config()
+            client = await self._get_client()
+            
+            if self.settings.ai_provider == "gemini":
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.0, "maxOutputTokens": 10}
+                }
+            elif self.settings.ai_provider == "anthropic":
+                payload = {
+                    "model": self.settings.ai_model,
+                    "system": "Respond with valid JSON only.",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.0,
+                    "max_tokens": 10
+                }
+            else:
+                payload = {
+                    "model": self.settings.ai_model,
+                    "messages": [
+                        {"role": "system", "content": "Respond with valid JSON only."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.0,
+                    "max_tokens": 10
+                }
+            
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            logger.error("ai_provider_ping_failed", error=str(e))
+            return False
 
     async def close(self):
         if self._client and not self._client.is_closed:

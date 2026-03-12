@@ -1,19 +1,23 @@
 """API router for analysis history."""
 
 import structlog
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 
 from app.config import get_settings
 from app.db.session import get_db
 from app.models.models import ErrorAnalysis
 from app.models.schemas import HistoryResponse, AnalysisRecord
 from app.rate_limit import limiter
+from app.middleware.auth import AdminAuthRequired
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api", tags=["History"])
 settings = get_settings()
+
+# Admin authentication dependency
+admin_auth = AdminAuthRequired(settings.secret_key)
 
 
 @router.get("/history", response_model=HistoryResponse)
@@ -62,10 +66,9 @@ async def get_history(
 async def delete_all_history(
     request: Request,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(admin_auth),
 ):
     """Delete all analysis records from history."""
-    from sqlalchemy import delete
-    
     # 1. Delete from PostgreSQL
     await db.execute(delete(ErrorAnalysis))
     await db.commit()
@@ -87,13 +90,9 @@ async def delete_category_history(
     request: Request,
     category: str,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(admin_auth),
 ):
     """Delete all analysis records for a specific category."""
-    from fastapi import HTTPException
-    from sqlalchemy import delete
-    from app.services.vector_service import vector_service
-    from app.services.cache_service import cache_service
-
     # Map category to input_type
     category_map = {
         "runtime": "error",
@@ -115,9 +114,11 @@ async def delete_category_history(
          return {"message": f"No history found for category {category}"}
 
     # 2. Delete from Vector DB
+    from app.services.vector_service import vector_service
     await vector_service.delete_analyses(analysis_ids)
     
     # 3. Clear Cache
+    from app.services.cache_service import cache_service
     await cache_service.clear_category(input_type)
 
     # 4. Delete from Postgres
@@ -133,10 +134,9 @@ async def delete_history(
     request: Request,
     analysis_id: str,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(admin_auth),
 ):
     """Delete an analysis record from history."""
-    from fastapi import HTTPException
-    
     query = select(ErrorAnalysis).where(ErrorAnalysis.id == analysis_id)
     result = await db.execute(query)
     analysis = result.scalar_one_or_none()

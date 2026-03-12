@@ -11,10 +11,11 @@ from slowapi.errors import RateLimitExceeded
 from app.config import get_settings
 from app.middleware.audit import AuditLoggingMiddleware
 from app.middleware.error_handler import ErrorHandlerMiddleware
+from app.middleware.input_validation import EnhancedInputValidationMiddleware
 from app.middleware.logging_config import setup_logging
 from app.middleware.security import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
 from app.rate_limit import limiter
-from app.routers import analysis, history
+from app.routers import analysis, history, health
 from app.services.ai_service import ai_service
 from app.services.cache_service import cache_service
 from app.services.turnstile_service import turnstile_service
@@ -50,6 +51,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestSizeLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
+app.add_middleware(EnhancedInputValidationMiddleware)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_host_list)
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(
@@ -65,6 +67,7 @@ app.add_middleware(AuditLoggingMiddleware)
 # ── Routers ──
 app.include_router(analysis.router)
 app.include_router(history.router)
+app.include_router(health.router)
 
 
 @app.get("/", tags=["Health"])

@@ -1,0 +1,223 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-security-check:
+    runs-on: ubuntu-latest
+    name: Backend Security & Dependency Check
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install bandit safety
+
+    - name: Run Bandit security scan
+      run: |
+        cd backend
+        bandit -r . -f json -o bandit-report.json || true
+        bandit -r .
+
+    - name: Check dependencies for known vulnerabilities
+      run: |
+        cd backend
+        safety check --json --output safety-report.json || true
+        safety check
+
+    - name: Run code quality checks
+      run: |
+        cd backend
+        pip install ruff
+        ruff check . --output-format=full
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          backend/bandit-report.json
+          backend/safety-report.json
+
+  frontend-security-check:
+    runs-on: ubuntu-latest
+    name: Frontend Security & Dependency Check
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Run npm audit
+      run: |
+        cd frontend
+        npm audit --audit-level=moderate
+
+    - name: Check for outdated packages
+      run: |
+        cd frontend
+        npm outdated || true
+
+    - name: Run TypeScript check
+      run: |
+        cd frontend
+        npx tsc --noEmit
+
+    - name: Run ESLint
+      run: |
+        cd frontend
+        npx eslint . --ext .ts,.tsx --format=stylish
+
+  docker-security-scan:
+    runs-on: ubuntu-latest
+    name: Docker Security Scan
+    needs: [backend-security-check, frontend-security-check]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        docker build -t bugsense-ai:latest .
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'bugsense-ai:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  test-backend:
+    runs-on: ubuntu-latest
+    name: Backend Tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+
+    - name: Run basic configuration tests
+      run: |
+        cd backend
+        python -c "
+        from app.config import get_settings
+        settings = get_settings()
+        print('✓ Configuration loaded successfully')
+        print(f'✓ App name: {settings.app_name}')
+        print(f'✓ Environment: {settings.app_env}')
+        print(f'✓ Database URL configured: {bool(settings.database_url)}')
+        print(f'✓ AI provider: {settings.ai_provider}')
+        "
+
+    - name: Test database connection
+      run: |
+        cd backend
+        python -c "
+        import asyncio
+        from app.db.session import get_db
+        from sqlalchemy import text
+        
+        async def test_db():
+            async with get_db() as db:
+                result = await db.execute(text('SELECT 1'))
+                print('✓ Database connection successful')
+        
+        asyncio.run(test_db())
+        "
+
+    - name: Test AI service configuration
+      run: |
+        cd backend
+        python -c "
+        from app.services.ai_service import ai_service
+        from app.config import get_settings
+        
+        settings = get_settings()
+        print('✓ AI service initialized')
+        print(f'✓ Provider: {settings.ai_provider}')
+        
+        # Test that required secrets are configured
+        if settings.ai_provider == 'nvidia':
+            assert settings.nvidia_api_key, 'NVIDIA_API_KEY not configured'
+        elif settings.ai_provider == 'gemini':
+            assert settings.gemini_api_key, 'GEMINI_API_KEY not configured'
+        elif settings.ai_provider == 'openai':
+            assert settings.openai_api_key, 'OPENAI_API_KEY not configured'
+        elif settings.ai_provider == 'anthropic':
+            assert settings.anthropic_api_key, 'ANTHROPIC_API_KEY not configured'
+        elif settings.ai_provider == 'openrouter':
+            assert settings.openrouter_api_key, 'OPENROUTER_API_KEY not configured'
+        
+        print('✓ AI provider configuration validated')
+        "
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    name: Deploy to Staging
+    needs: [backend-security-check, frontend-security-check, test-backend]
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to Railway (Staging)
+      run: |
+        echo "Deploy to staging environment"
+        # Add actual deployment commands here
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    needs: [backend-security-check, frontend-security-check, test-backend]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Deploy to Railway (Production)
+      run: |
+        echo "Deploy to production environment"
+        # Add actual deployment commands here

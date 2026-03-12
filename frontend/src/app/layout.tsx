@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const inter = Inter({
     subsets: ["latin"],
@@ -91,7 +92,9 @@ export default function RootLayout({
                 </nav>
 
                 {/* ── Main content ── */}
-                <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
+                <ErrorBoundary>
+                    <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
+                </ErrorBoundary>
 
                 {/* ── Footer ── */}
                 <footer className="border-t border-white/5 mt-16">
