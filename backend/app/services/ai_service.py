@@ -289,7 +289,11 @@ class AIService:
         try:
             result = json.loads(content)
         except json.JSONDecodeError as e:
-            logger.error("json_parse_error", error=str(e), raw_content=content)
+            logger.error(
+                "json_parse_error",
+                error=str(e),
+                raw_content_length=len(content),
+            )
             result = {
                 "language": "unknown",
                 "environment": "unknown",
