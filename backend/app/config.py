@@ -43,6 +43,10 @@ class Settings(BaseSettings):
 
     # ── Rate Limiting ──
     rate_limit_per_minute: int = 30
+    analysis_rate_limit_per_minute: int = 10
+    history_rate_limit_per_minute: int = 30
+    history_mutation_rate_limit_per_minute: int = 5
+    health_rate_limit_per_minute: int = 120
 
     @field_validator("debug", mode="before")
     @classmethod

@@ -2,17 +2,17 @@
 
 from contextlib import asynccontextmanager
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging_config import setup_logging
 from app.middleware.security import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
+from app.rate_limit import limiter
 from app.routers import analysis, history
 from app.services.ai_service import ai_service
 from app.services.cache_service import cache_service
@@ -21,10 +21,6 @@ from app.services.turnstile_service import turnstile_service
 settings = get_settings()
 setup_logging(debug=settings.debug)
 logger = structlog.get_logger(__name__)
-
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.rate_limit_per_minute}/minute"])
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -70,10 +66,12 @@ app.include_router(history.router)
 
 
 @app.get("/", tags=["Health"])
-async def root():
-    return {"status": "ok", "service": settings.app_name, "version": "1.0.0"}
+@limiter.limit(f"{settings.health_rate_limit_per_minute}/minute")
+async def root(request: Request):
+    return {"status": "ok"}
 
 
 @app.get("/health", tags=["Health"])
-async def health_check():
-    return {"status": "healthy", "env": settings.app_env}
+@limiter.limit(f"{settings.health_rate_limit_per_minute}/minute")
+async def health_check(request: Request):
+    return {"status": "healthy"}

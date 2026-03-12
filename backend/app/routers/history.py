@@ -1,20 +1,25 @@
 """API router for analysis history."""
 
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+from app.config import get_settings
 from app.db.session import get_db
 from app.models.models import ErrorAnalysis
 from app.models.schemas import HistoryResponse, AnalysisRecord
+from app.rate_limit import limiter
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api", tags=["History"])
+settings = get_settings()
 
 
 @router.get("/history", response_model=HistoryResponse)
+@limiter.limit(f"{settings.history_rate_limit_per_minute}/minute")
 async def get_history(
+    request: Request,
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
     input_type: str = Query(None, description="Filter by type: error, log, issue, code"),
@@ -53,7 +58,9 @@ async def get_history(
     return HistoryResponse(items=items, total=total, page=page, per_page=per_page)
 
 @router.delete("/history/all")
+@limiter.limit(f"{settings.history_mutation_rate_limit_per_minute}/minute")
 async def delete_all_history(
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     """Delete all analysis records from history."""
@@ -75,7 +82,9 @@ async def delete_all_history(
     return {"message": "All history records deleted successfully"}
 
 @router.delete("/history/category/{category}")
+@limiter.limit(f"{settings.history_mutation_rate_limit_per_minute}/minute")
 async def delete_category_history(
+    request: Request,
     category: str,
     db: AsyncSession = Depends(get_db),
 ):
@@ -119,7 +128,9 @@ async def delete_category_history(
     return {"message": f"History for {category} deleted successfully"}
 
 @router.delete("/history/{analysis_id}")
+@limiter.limit(f"{settings.history_mutation_rate_limit_per_minute}/minute")
 async def delete_history(
+    request: Request,
     analysis_id: str,
     db: AsyncSession = Depends(get_db),
 ):

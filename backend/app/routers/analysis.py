@@ -5,6 +5,7 @@ import structlog
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.session import get_db
 from app.models.models import ErrorAnalysis
 from app.models.schemas import (
@@ -17,10 +18,12 @@ from app.models.schemas import (
 from app.services.ai_service import ai_service
 from app.services.vector_service import vector_service
 from app.services.cache_service import cache_service
+from app.rate_limit import limiter
 from app.services.turnstile_service import turnstile_service
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api", tags=["Analysis"])
+settings = get_settings()
 
 
 async def _run_pipeline(
@@ -66,53 +69,57 @@ async def _run_pipeline(
 
 
 @router.post("/analyze-error", response_model=AnalysisResponse)
-async def analyze_error(request: AnalyzeErrorRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
+@limiter.limit(f"{settings.analysis_rate_limit_per_minute}/minute")
+async def analyze_error(request: Request, payload: AnalyzeErrorRequest, db: AsyncSession = Depends(get_db)):
     """Analyze a stack trace or error message."""
-    await turnstile_service.verify(request.turnstile_token, http_request)
+    await turnstile_service.verify(payload.turnstile_token, request)
     return await _run_pipeline(
-        input_text=request.input_text,
+        input_text=payload.input_text,
         input_type="error",
         analysis_func=ai_service.analyze_error,
         db=db,
-        language_hint=request.language_hint,
+        language_hint=payload.language_hint,
     )
 
 
 @router.post("/analyze-log", response_model=AnalysisResponse)
-async def analyze_log(request: AnalyzeLogRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
+@limiter.limit(f"{settings.analysis_rate_limit_per_minute}/minute")
+async def analyze_log(request: Request, payload: AnalyzeLogRequest, db: AsyncSession = Depends(get_db)):
     """Analyze CI/CD build logs."""
-    await turnstile_service.verify(request.turnstile_token, http_request)
+    await turnstile_service.verify(payload.turnstile_token, request)
     return await _run_pipeline(
-        input_text=request.input_text,
+        input_text=payload.input_text,
         input_type="log",
         analysis_func=ai_service.analyze_log,
         db=db,
-        ci_platform=request.ci_platform,
+        ci_platform=payload.ci_platform,
     )
 
 
 @router.post("/analyze-issue", response_model=AnalysisResponse)
-async def analyze_issue(request: AnalyzeIssueRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
+@limiter.limit(f"{settings.analysis_rate_limit_per_minute}/minute")
+async def analyze_issue(request: Request, payload: AnalyzeIssueRequest, db: AsyncSession = Depends(get_db)):
     """Analyze a GitHub issue."""
-    await turnstile_service.verify(request.turnstile_token, http_request)
+    await turnstile_service.verify(payload.turnstile_token, request)
     return await _run_pipeline(
-        input_text=request.input_text,
+        input_text=payload.input_text,
         input_type="issue",
         analysis_func=ai_service.analyze_issue,
         db=db,
-        repo_url=request.repo_url,
+        repo_url=payload.repo_url,
     )
 
 
 @router.post("/fix-code", response_model=AnalysisResponse)
-async def fix_code(request: CodeFixRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
+@limiter.limit(f"{settings.analysis_rate_limit_per_minute}/minute")
+async def fix_code(request: Request, payload: CodeFixRequest, db: AsyncSession = Depends(get_db)):
     """Generate a fix for buggy code."""
-    await turnstile_service.verify(request.turnstile_token, http_request)
+    await turnstile_service.verify(payload.turnstile_token, request)
     return await _run_pipeline(
-        input_text=request.buggy_code,
+        input_text=payload.buggy_code,
         input_type="code",
         analysis_func=ai_service.fix_code,
         db=db,
-        error_message=request.error_message,
-        language=request.language,
+        error_message=payload.error_message,
+        language=payload.language,
     )
