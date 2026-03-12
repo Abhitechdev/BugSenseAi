@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
+    trusted_hosts: str = "localhost,127.0.0.1,backend,*.railway.app,*.railway.internal"
+    max_request_body_bytes: int = 262144
     cors_origins: str = "http://localhost:3000,http://frontend:3000"
     cors_origin_regex: str = r"https://.*\.up\.railway\.app"
 
@@ -73,6 +75,14 @@ class Settings(BaseSettings):
     def cors_origin_regex_value(self) -> str | None:
         normalized = self.cors_origin_regex.strip()
         return normalized or None
+
+    @property
+    def trusted_host_list(self) -> List[str]:
+        return [host.strip() for host in self.trusted_hosts.split(",") if host.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.strip().lower() == "production"
 
     class Config:
         env_file = (".env.local", ".env")

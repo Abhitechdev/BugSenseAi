@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -11,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import get_settings
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging_config import setup_logging
+from app.middleware.security import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
 from app.routers import analysis, history
 from app.services.ai_service import ai_service
 from app.services.cache_service import cache_service
@@ -38,14 +40,18 @@ app = FastAPI(
     description="AI-powered developer tool that explains software errors and suggests fixes.",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
 )
 
 # ── Middleware ──
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestSizeLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_host_list)
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(
     CORSMiddleware,
