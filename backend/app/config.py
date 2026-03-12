@@ -51,6 +51,13 @@ class Settings(BaseSettings):
                 return False
         return value
 
+    @field_validator("ai_provider", mode="before")
+    @classmethod
+    def normalize_ai_provider(cls, value):
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
     @field_validator("database_url", mode="before")
     @classmethod
     def normalize_database_url(cls, value):
