@@ -2,7 +2,23 @@
 
 import type { AnalysisResponse, HistoryResponse, InputType } from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const DEFAULT_LOCAL_API_BASE = "http://localhost:8000";
+const DEFAULT_RAILWAY_API_BASE = "https://bugsenseai-production.up.railway.app";
+
+function getApiBase(): string {
+    const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (configured) {
+        return configured.replace(/\/$/, "");
+    }
+
+    if (typeof window !== "undefined" && window.location.hostname.endsWith(".up.railway.app")) {
+        return DEFAULT_RAILWAY_API_BASE;
+    }
+
+    return DEFAULT_LOCAL_API_BASE;
+}
+
+const API_BASE = getApiBase();
 
 class ApiError extends Error {
     status: number;

@@ -156,45 +156,57 @@ class AIService:
             self._client = httpx.AsyncClient(timeout=60.0)
         return self._client
 
+    @staticmethod
+    def _require_secret(name: str, value: str) -> str:
+        secret = value.strip()
+        if not secret:
+            raise ValueError(f"{name} is not configured")
+        return secret
+
     def _get_api_config(self) -> tuple[str, dict]:
         """Returns (base_url, headers) based on configured provider."""
         if self.settings.ai_provider == "nvidia":
+            api_key = self._require_secret("NVIDIA_API_KEY", self.settings.nvidia_api_key)
             return (
                 "https://integrate.api.nvidia.com/v1/chat/completions",
                 {
-                    "Authorization": f"Bearer {self.settings.nvidia_api_key}",
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
             )
         elif self.settings.ai_provider == "gemini":
+            api_key = self._require_secret("GEMINI_API_KEY", self.settings.gemini_api_key)
             return (
-                f"https://generativelanguage.googleapis.com/v1beta/models/{self.settings.ai_model}:generateContent?key={self.settings.gemini_api_key}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{self.settings.ai_model}:generateContent?key={api_key}",
                 {
                     "Content-Type": "application/json",
                 },
             )
         elif self.settings.ai_provider == "anthropic":
+            api_key = self._require_secret("ANTHROPIC_API_KEY", self.settings.anthropic_api_key)
             return (
                 "https://api.anthropic.com/v1/messages",
                 {
-                    "x-api-key": self.settings.anthropic_api_key,
+                    "x-api-key": api_key,
                     "anthropic-version": "2023-06-01",
                     "Content-Type": "application/json",
                 },
             )
         elif self.settings.ai_provider == "openai":
+            api_key = self._require_secret("OPENAI_API_KEY", self.settings.openai_api_key)
             return (
                 "https://api.openai.com/v1/chat/completions",
                 {
-                    "Authorization": f"Bearer {self.settings.openai_api_key}",
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
             )
         else:  # openrouter
+            api_key = self._require_secret("OPENROUTER_API_KEY", self.settings.openrouter_api_key)
             return (
                 "https://openrouter.ai/api/v1/chat/completions",
                 {
-                    "Authorization": f"Bearer {self.settings.openrouter_api_key}",
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                     "HTTP-Referer": "https://bugsense.ai",
                     "X-Title": "BugSense AI",
