@@ -12,6 +12,7 @@ import asyncio
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import models so Alembic can detect them
+from app.config import normalize_async_database_url
 from app.db.session import Base
 from app.models.models import User, ErrorAnalysis  # noqa: F401
 
@@ -21,7 +22,7 @@ if config.config_file_name is not None:
 
 database_url = os.getenv("DATABASE_URL")
 if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+    config.set_main_option("sqlalchemy.url", normalize_async_database_url(database_url))
 
 target_metadata = Base.metadata
 
@@ -49,7 +50,7 @@ async def run_async_migrations():
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        url=config.get_main_option("sqlalchemy.url").replace("postgresql://", "postgresql+asyncpg://"),
+        url=normalize_async_database_url(config.get_main_option("sqlalchemy.url")),
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

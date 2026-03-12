@@ -7,7 +7,7 @@ HOST="${BACKEND_HOST:-0.0.0.0}"
 PORT="${PORT:-${BACKEND_PORT:-8000}}"
 
 echo "⏳ Waiting for PostgreSQL to be ready..."
-while ! python -c "import asyncio, asyncpg; asyncio.run(asyncpg.connect('$DATABASE_URL'.replace('+asyncpg', '')))" 2>/dev/null; do
+while ! python -c "import asyncio, os, asyncpg; from app.db.url import normalize_asyncpg_connect_url; asyncio.run(asyncpg.connect(normalize_asyncpg_connect_url(os.environ['DATABASE_URL'])))" 2>/dev/null; do
     sleep 1
 done
 echo "✅ PostgreSQL is ready"

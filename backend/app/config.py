@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import List
 from pydantic import field_validator
+from app.db.url import normalize_async_database_url
 
 
 class Settings(BaseSettings):
@@ -47,6 +48,13 @@ class Settings(BaseSettings):
                 return True
             if normalized in {"false", "0", "no", "off"}:
                 return False
+        return value
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value):
+        if isinstance(value, str):
+            return normalize_async_database_url(value)
         return value
 
     @property

@@ -94,6 +94,8 @@ RATE_LIMIT_PER_MINUTE=30
 
 If Railway names the database services differently in your project, use the reference variables from those actual service names in the Variables UI.
 
+Railway Postgres exposes a plain `postgresql://...` connection string. The backend normalizes that to `postgresql+asyncpg://...` automatically for SQLAlchemy async usage, so you can keep the variable exactly as `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+
 6. Deploy the backend service.
 7. After the first successful deploy, open Networking and click Generate Domain.
 8. Copy the generated backend public URL. You will need it for the frontend.
