@@ -1,5 +1,18 @@
 import type { Metadata } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-sans",
+});
+
+const jetBrainsMono = JetBrains_Mono({
+    subsets: ["latin"],
+    display: "swap",
+    variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
     title: "BugSense AI — AI-Powered Error Analysis",
@@ -21,7 +34,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en" className="dark">
+        <html lang="en" className={`${inter.variable} ${jetBrainsMono.variable} dark`}>
             <body className="min-h-screen bg-surface-950 antialiased">
                 {/* ── Background gradient orbs ── */}
                 <div className="fixed inset-0 -z-10 overflow-hidden">
