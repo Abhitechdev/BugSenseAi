@@ -9,11 +9,19 @@ import bleach
 class AnalyzeRequest(BaseModel):
     """Base request for all analysis endpoints."""
     input_text: str = Field(..., min_length=10, max_length=50000, description="The error/log/issue text to analyze")
+    turnstile_token: Optional[str] = Field(None, max_length=2048, description="Cloudflare Turnstile token")
 
     @field_validator("input_text")
     @classmethod
     def sanitize_input(cls, v: str) -> str:
         return bleach.clean(v, tags=[], strip=True)
+
+    @field_validator("turnstile_token")
+    @classmethod
+    def sanitize_turnstile_token(cls, v: Optional[str]) -> Optional[str]:
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 
 class AnalyzeErrorRequest(AnalyzeRequest):
@@ -36,11 +44,19 @@ class CodeFixRequest(BaseModel):
     buggy_code: str = Field(..., min_length=5, max_length=50000, description="The buggy code to fix")
     error_message: Optional[str] = Field(None, max_length=5000, description="Optional error message")
     language: Optional[str] = Field(None, max_length=50, description="Programming language")
+    turnstile_token: Optional[str] = Field(None, max_length=2048, description="Cloudflare Turnstile token")
 
     @field_validator("buggy_code")
     @classmethod
     def sanitize_code(cls, v: str) -> str:
         return bleach.clean(v, tags=[], strip=True)
+
+    @field_validator("turnstile_token")
+    @classmethod
+    def sanitize_code_turnstile_token(cls, v: Optional[str]) -> Optional[str]:
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 
 class AnalysisResponse(BaseModel):

@@ -2,7 +2,7 @@
 
 import uuid
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -17,6 +17,7 @@ from app.models.schemas import (
 from app.services.ai_service import ai_service
 from app.services.vector_service import vector_service
 from app.services.cache_service import cache_service
+from app.services.turnstile_service import turnstile_service
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api", tags=["Analysis"])
@@ -65,8 +66,9 @@ async def _run_pipeline(
 
 
 @router.post("/analyze-error", response_model=AnalysisResponse)
-async def analyze_error(request: AnalyzeErrorRequest, db: AsyncSession = Depends(get_db)):
+async def analyze_error(request: AnalyzeErrorRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
     """Analyze a stack trace or error message."""
+    await turnstile_service.verify(request.turnstile_token, http_request)
     return await _run_pipeline(
         input_text=request.input_text,
         input_type="error",
@@ -77,8 +79,9 @@ async def analyze_error(request: AnalyzeErrorRequest, db: AsyncSession = Depends
 
 
 @router.post("/analyze-log", response_model=AnalysisResponse)
-async def analyze_log(request: AnalyzeLogRequest, db: AsyncSession = Depends(get_db)):
+async def analyze_log(request: AnalyzeLogRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
     """Analyze CI/CD build logs."""
+    await turnstile_service.verify(request.turnstile_token, http_request)
     return await _run_pipeline(
         input_text=request.input_text,
         input_type="log",
@@ -89,8 +92,9 @@ async def analyze_log(request: AnalyzeLogRequest, db: AsyncSession = Depends(get
 
 
 @router.post("/analyze-issue", response_model=AnalysisResponse)
-async def analyze_issue(request: AnalyzeIssueRequest, db: AsyncSession = Depends(get_db)):
+async def analyze_issue(request: AnalyzeIssueRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
     """Analyze a GitHub issue."""
+    await turnstile_service.verify(request.turnstile_token, http_request)
     return await _run_pipeline(
         input_text=request.input_text,
         input_type="issue",
@@ -101,8 +105,9 @@ async def analyze_issue(request: AnalyzeIssueRequest, db: AsyncSession = Depends
 
 
 @router.post("/fix-code", response_model=AnalysisResponse)
-async def fix_code(request: CodeFixRequest, db: AsyncSession = Depends(get_db)):
+async def fix_code(request: CodeFixRequest, http_request: Request, db: AsyncSession = Depends(get_db)):
     """Generate a fix for buggy code."""
+    await turnstile_service.verify(request.turnstile_token, http_request)
     return await _run_pipeline(
         input_text=request.buggy_code,
         input_type="code",

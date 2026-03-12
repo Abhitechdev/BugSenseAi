@@ -16,6 +16,7 @@ from app.middleware.security import RequestSizeLimitMiddleware, SecurityHeadersM
 from app.routers import analysis, history
 from app.services.ai_service import ai_service
 from app.services.cache_service import cache_service
+from app.services.turnstile_service import turnstile_service
 
 settings = get_settings()
 setup_logging(debug=settings.debug)
@@ -33,6 +34,7 @@ async def lifespan(app: FastAPI):
     logger.info("bugsense_shutting_down")
     await ai_service.close()
     await cache_service.close()
+    await turnstile_service.close()
 
 
 app = FastAPI(

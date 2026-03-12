@@ -48,28 +48,28 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-    analyzeError: (input_text: string, language_hint?: string) =>
+    analyzeError: (input_text: string, language_hint?: string, turnstile_token?: string | null) =>
         request<AnalysisResponse>("/api/analyze-error", {
             method: "POST",
-            body: JSON.stringify({ input_text, language_hint }),
+            body: JSON.stringify({ input_text, language_hint, turnstile_token }),
         }),
 
-    analyzeLog: (input_text: string, ci_platform?: string) =>
+    analyzeLog: (input_text: string, ci_platform?: string, turnstile_token?: string | null) =>
         request<AnalysisResponse>("/api/analyze-log", {
             method: "POST",
-            body: JSON.stringify({ input_text, ci_platform }),
+            body: JSON.stringify({ input_text, ci_platform, turnstile_token }),
         }),
 
-    analyzeIssue: (input_text: string, repo_url?: string) =>
+    analyzeIssue: (input_text: string, repo_url?: string, turnstile_token?: string | null) =>
         request<AnalysisResponse>("/api/analyze-issue", {
             method: "POST",
-            body: JSON.stringify({ input_text, repo_url }),
+            body: JSON.stringify({ input_text, repo_url, turnstile_token }),
         }),
 
-    fixCode: (buggy_code: string, error_message?: string, language?: string) =>
+    fixCode: (buggy_code: string, error_message?: string, language?: string, turnstile_token?: string | null) =>
         request<AnalysisResponse>("/api/fix-code", {
             method: "POST",
-            body: JSON.stringify({ buggy_code, error_message, language }),
+            body: JSON.stringify({ buggy_code, error_message, language, turnstile_token }),
         }),
 
     getHistory: (page = 1, per_page = 20, input_type?: InputType) => {

@@ -47,7 +47,7 @@ export default function HomePage() {
         }
     };
 
-    const handleAnalyze = async (text: string, type: InputType) => {
+    const handleAnalyze = async (text: string, type: InputType, turnstileToken: string | null) => {
         setIsLoading(true);
         setError(null);
         setResult(null);
@@ -57,16 +57,16 @@ export default function HomePage() {
 
             switch (type) {
                 case "error":
-                    response = await api.analyzeError(text);
+                    response = await api.analyzeError(text, undefined, turnstileToken);
                     break;
                 case "log":
-                    response = await api.analyzeLog(text);
+                    response = await api.analyzeLog(text, undefined, turnstileToken);
                     break;
                 case "issue":
-                    response = await api.analyzeIssue(text);
+                    response = await api.analyzeIssue(text, undefined, turnstileToken);
                     break;
                 case "code":
-                    response = await api.fixCode(text);
+                    response = await api.fixCode(text, undefined, undefined, turnstileToken);
                     break;
                 default:
                     throw new Error("Unknown analysis type");

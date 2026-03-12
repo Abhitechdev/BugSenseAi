@@ -2,6 +2,9 @@
 
 import React, { useState } from "react";
 import type { InputType, TabItem } from "@/types";
+import TurnstileWidget from "./TurnstileWidget";
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
 
 const TABS: TabItem[] = [
     {
@@ -43,7 +46,7 @@ const TABS: TabItem[] = [
 ];
 
 interface ErrorInputProps {
-    onSubmit: (text: string, type: InputType) => void;
+    onSubmit: (text: string, type: InputType, turnstileToken: string | null) => Promise<void>;
     isLoading: boolean;
     onDeleteCategory?: (type: InputType) => void;
     isDeleting?: boolean;
@@ -52,12 +55,20 @@ interface ErrorInputProps {
 export default function ErrorInput({ onSubmit, isLoading, onDeleteCategory, isDeleting }: ErrorInputProps) {
     const [activeTab, setActiveTab] = useState<InputType>("error");
     const [inputText, setInputText] = useState("");
+    const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+    const [turnstileResetNonce, setTurnstileResetNonce] = useState(0);
 
     const currentTab = TABS.find((t) => t.id === activeTab)!;
+    const turnstileRequired = Boolean(TURNSTILE_SITE_KEY);
+    const analyzeDisabled = isLoading || inputText.trim().length < 10 || (turnstileRequired && !turnstileToken);
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (inputText.trim().length < 10) return;
-        onSubmit(inputText, activeTab);
+        await onSubmit(inputText, activeTab, turnstileToken);
+        if (turnstileRequired) {
+            setTurnstileToken(null);
+            setTurnstileResetNonce((current) => current + 1);
+        }
     };
 
     return (
@@ -91,6 +102,19 @@ export default function ErrorInput({ onSubmit, isLoading, onDeleteCategory, isDe
                 spellCheck={false}
             />
 
+            {turnstileRequired && (
+                <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                    <p className="mb-3 text-sm text-gray-400">
+                        Complete the security check before submitting.
+                    </p>
+                    <TurnstileWidget
+                        siteKey={TURNSTILE_SITE_KEY}
+                        onTokenChange={setTurnstileToken}
+                        resetNonce={turnstileResetNonce}
+                    />
+                </div>
+            )}
+
             {/* ── Actions ── */}
             <div className="mt-4 flex items-center justify-between">
                 <span className="text-xs text-gray-500">
@@ -105,8 +129,8 @@ export default function ErrorInput({ onSubmit, isLoading, onDeleteCategory, isDe
                         Clear
                     </button>
                     <button
-                        onClick={handleSubmit}
-                        disabled={isLoading || inputText.trim().length < 10}
+                        onClick={() => void handleSubmit()}
+                        disabled={analyzeDisabled}
                         className="btn-primary flex items-center gap-2"
                     >
                         {isLoading ? (

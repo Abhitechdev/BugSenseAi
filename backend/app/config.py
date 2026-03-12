@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     max_request_body_bytes: int = 262144
     cors_origins: str = "http://localhost:3000,http://frontend:3000"
     cors_origin_regex: str = r"https://.*\.up\.railway\.app"
+    turnstile_secret_key: str = ""
+    turnstile_allowed_hostnames: str = "localhost,127.0.0.1,*.up.railway.app"
 
     # ── Database ──
     database_url: str = "postgresql+asyncpg://bugsense:bugsense_secret@postgres:5432/bugsense_db"
@@ -83,6 +85,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.strip().lower() == "production"
+
+    @property
+    def turnstile_allowed_hostname_list(self) -> List[str]:
+        return [host.strip() for host in self.turnstile_allowed_hostnames.split(",") if host.strip()]
+
+    @property
+    def turnstile_enabled(self) -> bool:
+        return bool(self.turnstile_secret_key.strip())
 
     class Config:
         env_file = (".env.local", ".env")
