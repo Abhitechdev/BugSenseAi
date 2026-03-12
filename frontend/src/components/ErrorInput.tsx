@@ -4,8 +4,6 @@ import React, { useState } from "react";
 import type { InputType, TabItem } from "@/types";
 import TurnstileWidget from "./TurnstileWidget";
 
-const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() || "";
-
 const TABS: TabItem[] = [
     {
         id: "error",
@@ -50,16 +48,23 @@ interface ErrorInputProps {
     isLoading: boolean;
     onDeleteCategory?: (type: InputType) => void;
     isDeleting?: boolean;
+    turnstileSiteKey: string;
 }
 
-export default function ErrorInput({ onSubmit, isLoading, onDeleteCategory, isDeleting }: ErrorInputProps) {
+export default function ErrorInput({
+    onSubmit,
+    isLoading,
+    onDeleteCategory,
+    isDeleting,
+    turnstileSiteKey,
+}: ErrorInputProps) {
     const [activeTab, setActiveTab] = useState<InputType>("error");
     const [inputText, setInputText] = useState("");
     const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
     const [turnstileResetNonce, setTurnstileResetNonce] = useState(0);
 
     const currentTab = TABS.find((t) => t.id === activeTab)!;
-    const turnstileRequired = Boolean(TURNSTILE_SITE_KEY);
+    const turnstileRequired = Boolean(turnstileSiteKey);
     const analyzeDisabled = isLoading || inputText.trim().length < 10 || (turnstileRequired && !turnstileToken);
 
     const handleSubmit = async () => {
@@ -108,7 +113,7 @@ export default function ErrorInput({ onSubmit, isLoading, onDeleteCategory, isDe
                         Complete the security check before submitting.
                     </p>
                     <TurnstileWidget
-                        siteKey={TURNSTILE_SITE_KEY}
+                        siteKey={turnstileSiteKey}
                         onTokenChange={setTurnstileToken}
                         resetNonce={turnstileResetNonce}
                     />
