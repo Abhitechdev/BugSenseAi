@@ -96,6 +96,8 @@ If Railway names the database services differently in your project, use the refe
 
 Railway Postgres exposes a plain `postgresql://...` connection string. The backend normalizes that to `postgresql+asyncpg://...` automatically for SQLAlchemy async usage, so you can keep the variable exactly as `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
 
+The backend also allows Railway public app domains via a default CORS regex. Keep `CORS_ORIGINS` for your final frontend/custom domain, but Railway preview or generated `*.up.railway.app` domains will still work during deployment.
+
 6. Deploy the backend service.
 7. After the first successful deploy, open Networking and click Generate Domain.
 8. Copy the generated backend public URL. You will need it for the frontend.

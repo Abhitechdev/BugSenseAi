@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
     cors_origins: str = "http://localhost:3000,http://frontend:3000"
+    cors_origin_regex: str = r"https://.*\.up\.railway\.app"
 
     # ── Database ──
     database_url: str = "postgresql+asyncpg://bugsense:bugsense_secret@postgres:5432/bugsense_db"
@@ -60,6 +61,11 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def cors_origin_regex_value(self) -> str | None:
+        normalized = self.cors_origin_regex.strip()
+        return normalized or None
 
     class Config:
         env_file = (".env.local", ".env")
