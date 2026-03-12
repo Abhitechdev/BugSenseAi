@@ -9,6 +9,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
+from app.middleware.audit import AuditLoggingMiddleware
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging_config import setup_logging
 from app.middleware.security import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
@@ -59,6 +60,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuditLoggingMiddleware)
 
 # ── Routers ──
 app.include_router(analysis.router)

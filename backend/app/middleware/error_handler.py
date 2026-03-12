@@ -42,26 +42,35 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 except Exception:
                     pass
                 logger.error("ai_api_error", path=request.url.path, status=exc.response.status_code, detail=detail)
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=502,
                     content={"error": "AI Service Error", "detail": detail},
                 )
+                if request_id := getattr(request.state, "request_id", None):
+                    response.headers.setdefault("X-Request-ID", request_id)
+                return response
 
             # Can't reach AI API
             if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
                 logger.error("connection_error", path=request.url.path, error=str(exc))
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=503,
                     content={"error": "Connection Error", "detail": "Could not connect to the AI service. Please check your network and try again."},
                 )
+                if request_id := getattr(request.state, "request_id", None):
+                    response.headers.setdefault("X-Request-ID", request_id)
+                return response
 
             # Validation errors
             if isinstance(exc, ValueError):
                 logger.warning("validation_error", path=request.url.path, error=str(exc))
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=422,
                     content={"error": "Validation Error", "detail": str(exc)},
                 )
+                if request_id := getattr(request.state, "request_id", None):
+                    response.headers.setdefault("X-Request-ID", request_id)
+                return response
 
             # Everything else
             logger.error(
@@ -71,7 +80,10 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                 error=str(exc),
                 error_type=type(exc).__name__,
             )
-            return JSONResponse(
+            response = JSONResponse(
                 status_code=500,
                 content={"error": "Internal Server Error", "detail": str(exc)},
             )
+            if request_id := getattr(request.state, "request_id", None):
+                response.headers.setdefault("X-Request-ID", request_id)
+            return response
