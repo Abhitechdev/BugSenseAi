@@ -153,17 +153,17 @@ class AIService:
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            # Configure client with better timeout handling
             timeout = httpx.Timeout(
-                connect=10.0,    # Connection timeout
-                read=60.0,       # Read timeout
-                write=30.0,      # Write timeout
-                pool=20.0        # Pool timeout
+                connect=10.0,
+                read=60.0,
+                write=30.0,
+                pool=20.0
             )
+            transport = httpx.AsyncHTTPTransport(retries=3)
             self._client = httpx.AsyncClient(
                 timeout=timeout,
                 limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
-                retries=3
+                transport=transport
             )
         return self._client
 
@@ -235,7 +235,6 @@ class AIService:
         url, headers = self._get_api_config()
         client = await self._get_client()
 
-        # Build payload based on provider
         if self.settings.ai_provider == "gemini":
             payload = {
                 "contents": [
@@ -273,8 +272,8 @@ class AIService:
             }
 
         logger.info(
-            "llm_request", 
-            provider=self.settings.ai_provider, 
+            "llm_request",
+            provider=self.settings.ai_provider,
             model=self.settings.ai_model,
             prompt_length=len(prompt)
         )
@@ -285,7 +284,6 @@ class AIService:
 
             data = response.json()
 
-            # Extract content based on provider response format
             if self.settings.ai_provider == "gemini":
                 content = data["candidates"][0]["content"]["parts"][0]["text"]
             elif self.settings.ai_provider == "anthropic":
@@ -293,7 +291,6 @@ class AIService:
             else:
                 content = data["choices"][0]["message"]["content"]
 
-            # Strip markdown code fences if present
             content = content.strip()
             if content.startswith("```json"):
                 content = content[7:]
@@ -301,13 +298,11 @@ class AIService:
                 content = content[3:]
             if content.endswith("```"):
                 content = content[:-3]
-            
-            # Sanitize AI output
+
             content = content.strip()
             content = content.replace("\n", " ")
             content = content.replace("\t", " ")
 
-            # Safe JSON parsing
             try:
                 result = json.loads(content)
             except json.JSONDecodeError as e:
@@ -326,13 +321,11 @@ class AIService:
                     "example_solution": ""
                 }
 
-            # Response Validation Layer
             required_keys = ["language", "environment", "error_type", "explanation", "root_cause", "fix", "example_solution"]
             for key in required_keys:
                 if key not in result:
                     result[key] = "Not available"
                 elif isinstance(result[key], list):
-                    # Ensure the field is converted to a string if AI returned a list (e.g., list of fix steps)
                     if key == "fix":
                         result[key] = "\n".join(f"- {step}" for step in result[key])
                     else:
@@ -340,7 +333,7 @@ class AIService:
 
             logger.info("llm_response_parsed", error_type=result.get("error_type"))
             return result
-            
+
         except httpx.TimeoutException as e:
             logger.error("llm_timeout_error", error=str(e), provider=self.settings.ai_provider)
             raise
@@ -349,8 +342,8 @@ class AIService:
             raise
         except httpx.HTTPStatusError as e:
             logger.error(
-                "llm_http_error", 
-                error=str(e), 
+                "llm_http_error",
+                error=str(e),
                 status_code=e.response.status_code,
                 provider=self.settings.ai_provider
             )
@@ -403,11 +396,10 @@ class AIService:
     async def ping(self):
         """Test AI provider connectivity with a simple request."""
         try:
-            # Use a minimal prompt to test connectivity
             prompt = "Test connectivity. Respond with: {\"status\": \"ok\"}"
             url, headers = self._get_api_config()
             client = await self._get_client()
-            
+
             if self.settings.ai_provider == "gemini":
                 payload = {
                     "contents": [{"parts": [{"text": prompt}]}],
@@ -431,7 +423,7 @@ class AIService:
                     "temperature": 0.0,
                     "max_tokens": 10
                 }
-            
+
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return True
