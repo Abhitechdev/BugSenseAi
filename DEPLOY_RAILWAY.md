@@ -169,3 +169,108 @@ Expected backend response:
 - `railway.internal` domains are for service-to-service access inside the Railway project.
 - The frontend needs the backend public URL because browsers cannot reach Railway private domains.
 - Chroma is optional for first deploy because the backend degrades gracefully if it cannot connect, but deploy it if you want similarity search.
+
+## Updated for Production Readiness (March 2026)
+
+### Security Enhancements
+
+The latest deployment includes comprehensive security improvements:
+
+1. **Input Validation**: Enhanced spam pattern detection with stricter validation rules
+2. **Audit Logging**: Sensitive data filtering to prevent logging of API keys and secrets
+3. **Rate Limiting**: Tightened limits for production environments
+4. **Security Headers**: Automatic security headers middleware
+5. **Request Size Limits**: Protection against large payload attacks
+
+### Production Configuration
+
+For production deployment, use these additional environment variables:
+
+```env
+# Security
+DEBUG=false
+SECRET_KEY=your-super-secret-production-key-here
+MAX_REQUEST_BODY_BYTES=262144
+
+# Rate Limiting (Production)
+RATE_LIMIT_PER_MINUTE=30
+ANALYSIS_RATE_LIMIT_PER_MINUTE=10
+HISTORY_RATE_LIMIT_PER_MINUTE=30
+HEALTH_RATE_LIMIT_PER_MINUTE=120
+
+# CORS (Production)
+CORS_ORIGINS=https://your-frontend-domain.com
+CORS_ORIGIN_REGEX=r"https://.*\.up\.railway\.app"
+
+# Trusted Hosts
+TRUSTED_HOSTS=your-frontend-domain.com,*.railway.app,*.railway.internal
+
+# AI Provider (Production)
+AI_PROVIDER=nvidia
+NVIDIA_API_KEY=your-production-nvidia-api-key
+AI_MODEL=meta/llama-3.3-70b-instruct
+
+# Database (Production)
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+
+# Redis (Production)
+REDIS_URL=${{Redis.REDIS_URL}}
+
+# ChromaDB (Production)
+CHROMA_HOST=chromadb.railway.internal
+CHROMA_PORT=8000
+
+# Optional: Cloudflare Turnstile
+TURNSTILE_SECRET_KEY=your-turnstile-secret-key
+TURNSTILE_ENABLED=true
+```
+
+### Health Check Endpoints
+
+The application now provides comprehensive health check endpoints:
+
+- `/health` - Basic health check
+- `/health/db` - Database connectivity
+- `/health/cache` - Redis cache status
+- `/health/vector` - ChromaDB vector database
+- `/health/ai` - AI provider connectivity
+- `/health/dependencies` - All external dependencies
+
+### Monitoring and Observability
+
+The application includes structured logging with sensitive data filtering and comprehensive audit logging for all requests. Use Railway's built-in monitoring or integrate with external monitoring services.
+
+### Rollback Strategy
+
+Railway supports easy rollback through the dashboard:
+1. Go to your service
+2. Click on "Deployments"
+3. Select a previous deployment
+4. Click "Rollback"
+
+### Troubleshooting
+
+Common issues and solutions:
+
+1. **Database Connection Issues**: Ensure `DATABASE_URL` is correctly set and PostgreSQL service is running
+2. **Redis Connection Issues**: Verify `REDIS_URL` and Redis service status
+3. **AI Provider Issues**: Check `NVIDIA_API_KEY` and network connectivity
+4. **CORS Issues**: Verify `CORS_ORIGINS` includes your frontend domain
+5. **Rate Limiting**: Adjust rate limit variables if legitimate requests are being blocked
+
+### Performance Optimization
+
+For optimal performance in production:
+
+1. **Database**: Enable connection pooling and monitor query performance
+2. **Redis**: Monitor memory usage and cache hit rates
+3. **AI Provider**: Monitor response times and implement caching where appropriate
+4. **Frontend**: Enable static asset caching and CDN usage
+
+### Security Best Practices
+
+1. **Secrets Management**: Use Railway's secret management for all sensitive data
+2. **Environment Isolation**: Use separate Railway projects for staging and production
+3. **Access Control**: Limit access to Railway dashboard and repository
+4. **Regular Updates**: Keep dependencies updated and monitor for security vulnerabilities
+5. **Backup Strategy**: Implement regular database backups using Railway's backup features
