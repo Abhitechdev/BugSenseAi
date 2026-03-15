@@ -152,20 +152,18 @@ class AIService:
         self._client: Optional[httpx.AsyncClient] = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None or self._client.is_closed:
-            timeout = httpx.Timeout(
-                connect=10.0,
-                read=60.0,
-                write=30.0,
-                pool=20.0
-            )
-            transport = httpx.AsyncHTTPTransport(retries=3)
-            self._client = httpx.AsyncClient(
-                timeout=timeout,
-                limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
-                transport=transport
-            )
-        return self._client
+    if self._client is None or self._client.is_closed:
+        timeout = httpx.Timeout(
+            connect=10.0,
+            read=60.0,
+            write=30.0,
+            pool=20.0
+        )
+        self._client = httpx.AsyncClient(
+            timeout=timeout,
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+        )
+    return self._client
 
     @staticmethod
     def _require_secret(name: str, value: str) -> str:
