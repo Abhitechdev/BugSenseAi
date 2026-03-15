@@ -163,7 +163,7 @@ class AIService:
             self._client = httpx.AsyncClient(
                 timeout=timeout,
                 limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
-                retries=3
+    
             )
         return self._client
 

@@ -73,6 +73,15 @@ class Settings(BaseSettings):
             return normalize_async_database_url(value)
         return value
 
+    @field_validator("ai_provider")
+    @classmethod
+    def validate_ai_provider(cls, value: str) -> str:
+        """Validate that the AI provider is one of the supported options."""
+        supported_providers = {"nvidia", "gemini", "openai", "openrouter", "anthropic"}
+        if value not in supported_providers:
+            raise ValueError(f"Unsupported AI provider: '{value}'. Must be one of {supported_providers}")
+        return value
+
     @property
     def cors_origin_list(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

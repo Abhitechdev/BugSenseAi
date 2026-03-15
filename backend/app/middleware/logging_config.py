@@ -14,6 +14,8 @@ _STRICT_REDACT_KEYS = {
     "api_key",
     "authorization",
     "cookie",
+    "gemini_api_key",
+    "nvidia_api_key",
     "openai_api_key",
     "openrouter_api_key",
     "password",

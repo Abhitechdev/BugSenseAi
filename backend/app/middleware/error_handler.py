@@ -82,7 +82,10 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
             )
             response = JSONResponse(
                 status_code=500,
-                content={"error": "Internal Server Error", "detail": str(exc)},
+                content={
+                    "error": "Internal Server Error",
+                    "detail": "An unexpected internal error occurred.",
+                },
             )
             if request_id := getattr(request.state, "request_id", None):
                 response.headers.setdefault("X-Request-ID", request_id)
