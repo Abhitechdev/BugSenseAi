@@ -5,7 +5,6 @@ import re
 from typing import Optional
 from urllib.parse import urlparse
 
-import bleach
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 MAX_INPUT_LENGTHS = {
@@ -32,8 +31,7 @@ URL_PATTERN = re.compile(r"https?://\S+")
 
 
 def _normalize_text(value: str) -> str:
-    cleaned = bleach.clean(value, tags=[], strip=True)
-    return cleaned.replace("\r\n", "\n").replace("\r", "\n").strip()
+    return value.replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
 def _validate_text_payload(value: str, kind: str) -> str:
@@ -63,7 +61,7 @@ def _validate_text_payload(value: str, kind: str) -> str:
 
 def _normalize_optional_text(value: Optional[str]) -> Optional[str]:
     if isinstance(value, str):
-        normalized = _normalize_text(value)
+        normalized = value.replace("\r\n", "\n").replace("\r", "\n").strip()
         return normalized or None
     return value
 
