@@ -16,6 +16,9 @@ redis==5.0.1
 openai==1.12.0
 httpx==0.27.0
 
+# Chroma 0.4.x is not compatible with NumPy 2.x on Python 3.12.
+numpy<2
+
 # ChromaDB (HTTP client only — connects to ChromaDB container)
 # 0.4.24 was unpublished from PyPI; the matching published build is 0.4.24.dev0.
 chromadb-client==0.4.24.dev0
