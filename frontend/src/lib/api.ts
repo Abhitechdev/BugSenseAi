@@ -4,6 +4,7 @@ import type { AnalysisResponse, HistoryResponse, InputType } from "@/types";
 
 const DEFAULT_LOCAL_API_BASE = "http://localhost:8000";
 const DEFAULT_RAILWAY_API_BASE = "https://bugsenseai-production.up.railway.app";
+const REQUEST_TIMEOUT_MS = 90000;
 
 function getApiBase(): string {
     const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -31,10 +32,25 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${API_BASE}${path}`;
-    const res = await fetch(url, {
-        headers: { "Content-Type": "application/json", ...options?.headers },
-        ...options,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            headers: { "Content-Type": "application/json", ...options?.headers },
+            ...options,
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+            throw new ApiError("Analysis is taking too long. The backend may still be waking up, so please retry in a moment.", 408);
+        }
+
+        throw new ApiError("Could not reach the backend. If this is the first request, the server may still be waking up.", 503);
+    } finally {
+        clearTimeout(timeoutId);
+    }
 
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));

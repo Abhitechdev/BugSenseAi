@@ -28,13 +28,15 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://frontend:3000"
     cors_origin_regex: str = r"https://.*\.up\.railway\.app"
     turnstile_secret_key: str = ""
-    turnstile_allowed_hostnames: str = "localhost,127.0.0.1,*.up.railway.app"
+    turnstile_allowed_hostnames: str = "localhost,127.0.0.1,*.up.railway.app,*.vercel.app,*.onrender.com"
 
     # ── Database ──
     database_url: str = "postgresql+asyncpg://bugsense:bugsense_secret@postgres:5432/bugsense_db"
 
     # ── Redis ──
     redis_url: str = "redis://redis:6379/0"
+    redis_connect_timeout_seconds: float = 1.5
+    redis_socket_timeout_seconds: float = 1.5
 
     # ── AI ──
     ai_provider: str = "nvidia"   # nvidia | gemini | openai | openrouter | anthropic
@@ -44,11 +46,18 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     anthropic_api_key: str = ""
     ai_model: str = "meta/llama-3.3-70b-instruct"
+    ai_connect_timeout_seconds: float = 5.0
+    ai_read_timeout_seconds: float = 30.0
+    ai_retry_attempts: int = 2
+    ai_max_tokens: int = 1400
 
     # ── ChromaDB ──
     chroma_host: str = "chromadb"
     chroma_port: int = 8000
     chroma_ssl: bool = False
+    chroma_enabled: bool = True
+    chroma_operation_timeout_seconds: float = 2.0
+    chroma_retry_cooldown_seconds: int = 120
 
     # ── Rate Limiting ──
     rate_limit_per_minute: int = 30

@@ -5,7 +5,7 @@ from typing import Optional
 
 import httpx
 import structlog
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app import config as app_config
 
@@ -165,6 +165,15 @@ LANGUAGE_INDICATORS = {
 }
 
 
+def _should_retry_llm_error(exc: BaseException) -> bool:
+    if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError)):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        return status == 429 or status >= 500
+    return False
+
+
 class AIService:
     """Handles all AI/LLM interactions for analysis."""
 
@@ -174,8 +183,13 @@ class AIService:
 
     def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            timeout = httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=20.0)
-            limits = httpx.Limits(max_connections=100, max_keepalive_connections=20)
+            timeout = httpx.Timeout(
+                connect=self.settings.ai_connect_timeout_seconds,
+                read=self.settings.ai_read_timeout_seconds,
+                write=15.0,
+                pool=10.0,
+            )
+            limits = httpx.Limits(max_connections=20, max_keepalive_connections=10)
             self._client = httpx.AsyncClient(timeout=timeout, limits=limits)
         return self._client
 
@@ -259,7 +273,7 @@ class AIService:
                 ],
                 "generationConfig": {
                     "temperature": 0.3,
-                    "maxOutputTokens": 2000,
+                    "maxOutputTokens": self.settings.ai_max_tokens,
                     "responseMimeType": "application/json",
                 },
             }
@@ -270,7 +284,7 @@ class AIService:
                 "system": "You are BugSense AI, an expert debugging assistant. Always respond with valid JSON only.",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.3,
-                "max_tokens": 2000,
+                "max_tokens": self.settings.ai_max_tokens,
             }
 
         return {
@@ -283,7 +297,7 @@ class AIService:
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.3,
-            "max_tokens": 2000,
+            "max_tokens": self.settings.ai_max_tokens,
         }
 
     def _extract_content(self, data: dict) -> str:
@@ -310,9 +324,9 @@ class AIService:
         return normalized
 
     @retry(
-        stop=stop_after_attempt(3),
+        stop=stop_after_attempt(app_config.get_settings().ai_retry_attempts),
         wait=wait_exponential(min=1, max=10),
-        retry=retry_if_exception_type((httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError)),
+        retry=retry_if_exception(_should_retry_llm_error),
         reraise=True,
     )
     async def _call_llm(self, prompt: str) -> dict:

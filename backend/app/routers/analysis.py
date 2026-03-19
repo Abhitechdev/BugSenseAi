@@ -1,5 +1,6 @@
 """API router for error, log, issue analysis and code fix endpoints."""
 
+import asyncio
 import uuid
 import structlog
 from fastapi import APIRouter, Depends, Request
@@ -26,6 +27,20 @@ router = APIRouter(prefix="/api", tags=["Analysis"])
 settings = get_settings()
 
 
+async def _safe_store_analysis(input_text: str, result: dict, analysis_id: str) -> None:
+    try:
+        await vector_service.store_analysis(input_text, result, analysis_id)
+    except Exception as exc:
+        logger.warning("vector_store_background_failed", error=str(exc), analysis_id=analysis_id)
+
+
+async def _safe_cache_result(input_type: str, input_text: str, result: dict) -> None:
+    try:
+        await cache_service.set_cached(input_type, input_text, result)
+    except Exception as exc:
+        logger.warning("cache_store_background_failed", error=str(exc), input_type=input_type)
+
+
 async def _run_pipeline(
     input_text: str,
     input_type: str,
@@ -40,15 +55,21 @@ async def _run_pipeline(
     if cached:
         return AnalysisResponse(**cached)
 
-    # 3. Search vector DB for similar errors
-    similar = await vector_service.search_similar(input_text)
+    similar_task = asyncio.create_task(vector_service.search_similar(input_text))
 
-    # 4. Call LLM
     result = await analysis_func(input_text, **kwargs)
     lang = result.get("language", "unknown")
+
+    similar = []
+    try:
+        similar = await asyncio.wait_for(similar_task, timeout=0.1)
+    except asyncio.TimeoutError:
+        similar_task.cancel()
+        logger.info("vector_search_deferred", input_type=input_type)
+    except Exception as exc:
+        logger.warning("vector_search_failed", input_type=input_type, error=str(exc))
     result["similar_errors_found"] = len(similar)
 
-    # 5. Store in database
     analysis_id = str(uuid.uuid4())
     db_record = ErrorAnalysis(
         id=analysis_id,
@@ -60,9 +81,8 @@ async def _run_pipeline(
     db.add(db_record)
     await db.flush()
 
-    # 6. Store in vector DB & cache (fire-and-forget style)
-    await vector_service.store_analysis(input_text, result, analysis_id)
-    await cache_service.set_cached(input_type, input_text, result)
+    asyncio.create_task(_safe_store_analysis(input_text, result, analysis_id))
+    asyncio.create_task(_safe_cache_result(input_type, input_text, result))
 
     logger.info("analysis_complete", input_type=input_type, analysis_id=analysis_id)
     return AnalysisResponse(**result)

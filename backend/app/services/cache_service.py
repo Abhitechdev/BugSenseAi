@@ -1,10 +1,12 @@
 """Redis caching service for BugSense AI."""
 
-import json
 import hashlib
-import structlog
+import json
 from typing import Optional
+
 import redis.asyncio as redis
+import structlog
+
 from app.config import get_settings
 
 logger = structlog.get_logger(__name__)
@@ -26,6 +28,9 @@ class CacheService:
                     settings.redis_url,
                     encoding="utf-8",
                     decode_responses=True,
+                    socket_connect_timeout=settings.redis_connect_timeout_seconds,
+                    socket_timeout=settings.redis_socket_timeout_seconds,
+                    retry_on_timeout=False,
                 )
                 await self._client.ping()
                 logger.info("redis_connected")
