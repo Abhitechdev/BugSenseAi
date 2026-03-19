@@ -17,7 +17,8 @@ openai==1.12.0
 httpx==0.27.0
 
 # ChromaDB (HTTP client only — connects to ChromaDB container)
-chromadb-client==0.4.24
+# 0.4.24 was unpublished from PyPI; the matching published build is 0.4.24.dev0.
+chromadb-client==0.4.24.dev0
 
 # Validation & Security
 pydantic==2.6.1
