@@ -67,6 +67,14 @@ class CacheService:
         except Exception as e:
             logger.error("cache_set_error", error=str(e))
 
+    async def ping(self) -> bool:
+        """Check whether Redis is reachable."""
+        client = await self._get_client()
+        if client is None:
+            raise RuntimeError("Redis client unavailable")
+        await client.ping()
+        return True
+
     async def close(self):
         if self._client:
             await self._client.close()

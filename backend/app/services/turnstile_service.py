@@ -79,6 +79,15 @@ class TurnstileService:
             logger.warning("turnstile_action_mismatch", expected=expected_action, actual=action)
             raise ValueError("Security challenge action mismatch.")
 
+    async def ping(self) -> bool:
+        """Check whether Turnstile is configured and the client can be created."""
+        if not self.settings.turnstile_enabled:
+            return True
+        if not self.settings.turnstile_secret_key.strip():
+            raise RuntimeError("Turnstile secret key not configured")
+        await self._get_client()
+        return True
+
     async def close(self):
         if self._client and not self._client.is_closed:
             await self._client.aclose()

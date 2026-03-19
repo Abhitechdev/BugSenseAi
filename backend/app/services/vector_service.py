@@ -92,6 +92,13 @@ class VectorService:
         except Exception as e:
             return []
 
+    async def ping(self) -> bool:
+        """Check whether ChromaDB is reachable."""
+        collection = self._ensure_collection()
+        if collection is None:
+            raise RuntimeError("ChromaDB collection unavailable")
+        return True
+
     async def delete_analysis(self, analysis_id: str) -> None:
         """Delete an analysis embedding from chromadb."""
         try:

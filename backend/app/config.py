@@ -1,13 +1,21 @@
 """Application configuration via environment variables."""
 
-from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import List
+
 from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from app.db.url import normalize_async_database_url
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=(".env.local", ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     # ── App ──
     app_name: str = "BugSense AI"
     app_env: str = "development"
@@ -57,6 +65,7 @@ class Settings(BaseSettings):
                 return True
             if normalized in {"false", "0", "no", "off"}:
                 return False
+            return False
         return value
 
     @field_validator("ai_provider", mode="before")
@@ -106,11 +115,6 @@ class Settings(BaseSettings):
     @property
     def turnstile_enabled(self) -> bool:
         return bool(self.turnstile_secret_key.strip())
-
-    class Config:
-        env_file = (".env.local", ".env")
-        env_file_encoding = "utf-8"
-
 
 @lru_cache()
 def get_settings() -> Settings:
