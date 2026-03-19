@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     # ── ChromaDB ──
     chroma_host: str = "chromadb"
     chroma_port: int = 8000
+    chroma_ssl: bool = False
 
     # ── Rate Limiting ──
     rate_limit_per_minute: int = 30

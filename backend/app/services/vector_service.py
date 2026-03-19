@@ -25,6 +25,7 @@ class VectorService:
                 self._client = chromadb.HttpClient(
                     host=settings.chroma_host,
                     port=settings.chroma_port,
+                    ssl=settings.chroma_ssl,
                 )
                 self._collection = self._client.get_or_create_collection(
                     name=self.COLLECTION_NAME,
